@@ -22,7 +22,14 @@
     },
     "scripts": {
         "post-create-project-cmd": [
-            "@php -r \"file_exists('.gitignore') || copy('stubs/default/.gitignore', '.gitignore');\""
+            "@php -r \"file_exists('.gitignore') || copy('stubs/default/.gitignore', '.gitignore');\"",
+            "@php -r \"array_map(function($f) { if (file_exists($f)) { unlink($f); } }, glob('stubs/default/*'));\"",
+            "@php -r \"array_map('unlink', glob('stubs/default/.*'));\"",
+            "@php -r \"rmdir('stubs/default');\"",
+            "@php -r \"rmdir('stubs');\"",
+            "@php -r \"unlink('README.md');\"",
+            "@php welcome.php",
+            "@php -r \"unlink('welcome.php');\""
         ]
     },
     "minimum-stability": "dev",
