@@ -18,12 +18,13 @@
     "autoload": {
         "psr-4": {
             "Luberius\\PhpTw\\": "src/"
-        },
-        "files": [
-            "bin/php-tw"
+        }
+    },
+    "scripts": {
+        "post-create-project-cmd": [
+            "@php -r \"file_exists('.gitignore') || copy('stubs/default/.gitignore', '.gitignore');\""
         ]
     },
-    "bin": ["bin/php-tw"],
     "minimum-stability": "dev",
     "prefer-stable": true
 }

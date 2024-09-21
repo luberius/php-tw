@@ -1,11 +1,10 @@
 #!/usr/bin/env php
 <?php
 
-use Symfony\Component\Console\Input\ArgvInput;
-
 require __DIR__.'/vendor/autoload.php';
 
-$status = (require_once __DIR__.'/bootstrap/app.php')
-    ->handleCommand(new ArgvInput);
+use Symfony\Component\Console\Application;
 
-exit($status);
+$app = require_once __DIR__.'/bootstrap/app.php';
+
+$app->run();
