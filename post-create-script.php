@@ -1,5 +1,20 @@
 <?php
 
+function copyDirectory($src, $dst) {
+    $dir = opendir($src);
+    @mkdir($dst);
+    while (false !== ($file = readdir($dir))) {
+        if (($file != '.') && ($file != '..')) {
+            if (is_dir($src . '/' . $file)) {
+                copyDirectory($src . '/' . $file, $dst . '/' . $file);
+            } else {
+                copy($src . '/' . $file, $dst . '/' . $file);
+            }
+        }
+    }
+    closedir($dir);
+}
+
 function removeDirectory($dir) {
     if (!file_exists($dir)) {
         return true;
@@ -22,26 +37,25 @@ function removeDirectory($dir) {
     return rmdir($dir);
 }
 
-// Copy .gitignore if it doesn't exist
-if (!file_exists('.gitignore') && file_exists('stubs/default/.gitignore')) {
-    copy('stubs/default/.gitignore', '.gitignore');
+// Copy contents from stubs/default to project root
+if (is_dir('stubs/default')) {
+    copyDirectory('stubs/default', '.');
+    echo "Copied stubs/default contents to project root.\n";
 }
 
 // Remove stubs directory
 removeDirectory('stubs');
-
-// Remove README.md
-if (file_exists('README.md')) {
-    unlink('README.md');
-}
+echo "Removed stubs directory.\n";
 
 // Display welcome message
 if (file_exists('welcome.php')) {
     include 'welcome.php';
     unlink('welcome.php');
+    echo "Displayed welcome message and removed welcome.php.\n";
 }
 
 echo "Post-creation tasks completed successfully.\n";
 
 // Remove this script
 unlink(__FILE__);
+echo "Removed post-create-script.php.\n";
