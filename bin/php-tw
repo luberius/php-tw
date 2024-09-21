@@ -1,0 +1,13 @@
+#!/usr/bin/env php
+<?php
+
+define('PHPTW_ROOT', dirname(__DIR__));
+
+require PHPTW_ROOT . '/vendor/autoload.php';
+
+use Symfony\Component\Console\Application;
+use Luberius\PhpTw\Console\Commands\NewCommand;
+
+$application = new Application('PHP-TW', '1.0.0');
+$application->add(new NewCommand());
+$application->run();

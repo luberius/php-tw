@@ -1,0 +1,44 @@
+# PHP-TW specific
+/app/css/app.bin.css
+
+# Composer
+/vendor/
+composer.lock
+
+# PHP
+*.log
+*.cache
+
+# IDEs and editors
+/.idea
+/.vscode
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment files
+.env
+.env.backup
+
+# Node (in case you decide to use npm packages in the future)
+/node_modules
+npm-debug.log
+yarn-error.log
+
+# Testing
+/phpunit.xml
+.phpunit.result.cache
+
+# Other
+*.bak
+*.tmp
+*.temp
