@@ -45,6 +45,7 @@ class ServeCommand extends Command
                 "",
                 "🌐 <info>Server running on</info> <comment>http://127.0.0.1:$port</comment>",
                 "🎨 <info>Tailwind CSS watching for changes...</info>",
+                "🔄 <info>Hot reload enabled for PHP files...</info>",
                 "",
                 "📢 <comment>Press Ctrl+C to stop the server and watcher.</comment>",
                 ""
@@ -52,7 +53,19 @@ class ServeCommand extends Command
 
             $this->registerShutdown($output);
 
+            $lastMtime = $this->getLatestFileModificationTime('app');
+
             while ($this->isProcessRunning($this->serverProcess) && $this->isProcessRunning($this->tailwindProcess)) {
+                pcntl_signal_dispatch();
+
+                $currentMtime = $this->getLatestFileModificationTime('app');
+
+                if ($currentMtime > $lastMtime) {
+                    $output->writeln('<comment>🔄 PHP files changed, restarting server...</comment>');
+                    $this->restartPhpServer($port, $output);
+                    $lastMtime = $currentMtime;
+                }
+
                 usleep(100000); // Sleep for 100ms to reduce CPU usage
             }
 
@@ -189,5 +202,43 @@ class ServeCommand extends Command
             }
         }
         proc_close($processInfo['process']);
+    }
+
+    protected function getLatestFileModificationTime($dir)
+    {
+        $latest = 0;
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && $file->getExtension() === 'php') {
+                $mtime = $file->getMTime();
+                if ($mtime > $latest) {
+                    $latest = $mtime;
+                }
+            }
+        }
+
+        return $latest;
+    }
+
+    protected function restartPhpServer($port, OutputInterface $output)
+    {
+        if ($this->serverProcess) {
+            proc_terminate($this->serverProcess['process'], SIGTERM);
+            foreach ($this->serverProcess['pipes'] as $pipe) {
+                if (is_resource($pipe)) {
+                    fclose($pipe);
+                }
+            }
+            proc_close($this->serverProcess['process']);
+        }
+
+        usleep(200000);
+
+        $this->serverProcess = $this->startProcess("php -S 127.0.0.1:$port -t app");
+        $output->writeln('<info>✅ Server restarted successfully</info>');
     }
 }

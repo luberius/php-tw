@@ -15,12 +15,20 @@
         "symfony/process": "^5.4",
         "luberius/tailwindcss": "^1.0"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
     "autoload": {
         "psr-4": {
             "Luberius\\PhpTw\\": "src/"
         }
     },
     "scripts": {
+        "test": "phpunit",
+        "test:unit": "phpunit --testsuite=Unit",
+        "test:feature": "phpunit --testsuite=Feature",
+        "test:coverage": "phpunit --coverage-html coverage",
+        "test:coverage-text": "phpunit --coverage-text",
         "post-create-project-cmd": [
             "@php post-create-script.php"
         ]

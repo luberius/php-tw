@@ -43,6 +43,12 @@ if (is_dir('stubs/default')) {
     echo "Copied stubs/default contents to project root.\n";
 }
 
+// Create .env from .env.example
+if (file_exists('.env.example') && !file_exists('.env')) {
+    copy('.env.example', '.env');
+    echo "Created .env file from .env.example.\n";
+}
+
 // Remove stubs directory
 removeDirectory('stubs');
 echo "Removed stubs directory.\n";

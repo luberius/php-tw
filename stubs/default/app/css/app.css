@@ -1,3 +1,29 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/*
+  Tailwind CSS v4 - CSS-based configuration
+
+  Customize your theme using the @theme directive:
+
+  @theme {
+    --color-primary: #3f3cbb;
+    --color-secondary: #f59e0b;
+
+    --font-display: "Inter", sans-serif;
+    --font-body: "System UI", sans-serif;
+
+    --breakpoint-3xl: 1920px;
+
+    --spacing-18: 4.5rem;
+
+    --radius-xl: 1rem;
+  }
+
+  Add custom utilities:
+
+  @utility tab-4 {
+    tab-size: 4;
+  }
+
+  Learn more: https://tailwindcss.com/docs/theme
+*/
