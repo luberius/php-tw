@@ -15,7 +15,7 @@ The `stubs/default/` directory contains the template files that get copied to us
 - **app/** - Web application files (includes CSS with v4 @import)
 - **.gitignore** - Version control rules
 
-**Note**: No `tailwind.config.js` file - Tailwind CSS v4 uses CSS-based configuration via `@theme` directive.
+**Note**: No `tailwind.config.js` file—Tailwind CSS v4 uses CSS-based configuration via `@theme` directives.
 
 ### 2. Post-Install Scaffolding
 
@@ -52,12 +52,13 @@ $app->run();
 ```php
 use Symfony\Component\Console\Application;
 
-$app = new Application('wand', '1.0.0');
+$app = new Application('wand', '1.1.0');
 
 // Auto-discover and register commands
 foreach (glob(__DIR__ . '/commands/*.php') as $file) {
-    $command = require $file;
-    $app->add($command);
+    require_once $file;
+    $class = 'Bootstrap\\Commands\\' . basename($file, '.php');
+    $app->add(new $class());
 }
 
 return $app;
@@ -75,7 +76,7 @@ return $app;
 ServeCommand::execute()
 │
 ├─> Port Discovery (findAvailablePort)
-│   └─> Tests ports 6969-7000 using socket_create/fsockopen
+│   └─> Tests ports 6969-7000 using stream_socket_server
 │
 ├─> Process 1: PHP Built-in Server
 │   └─> php -S 127.0.0.1:PORT -t app
@@ -88,8 +89,8 @@ ServeCommand::execute()
 ```
 
 **Process Management Strategy**:
-- Uses Symfony `Process` component
-- Runs processes in background mode (`start()` vs `run()`)
+- Uses Symfony `Process` with argument arrays rather than shell command strings
+- Runs processes in background mode with `start()`
 - Polls process status in monitoring loop
 - Outputs stdout/stderr in real-time
 
@@ -107,8 +108,8 @@ Tailwind CSS Wrapper
 │   ├─> Linux: x86_64, aarch64
 │   └─> Windows: x86_64
 │
-├─> Download & Cache (from /releases/latest/download/)
-│   └─> sys_get_temp_dir() + 'tailwindcss-cache'
+├─> Download & Cache (from validated GitHub release assets)
+│   └─> Validated, checksum-verified local cache
 │
 └─> Execution
     └─> Passthrough to Tailwind CLI with arguments

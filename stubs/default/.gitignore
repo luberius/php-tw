@@ -3,7 +3,6 @@
 
 # Composer
 /vendor/
-composer.lock
 
 # PHP
 *.log
@@ -35,7 +34,6 @@ npm-debug.log
 yarn-error.log
 
 # Testing
-/phpunit.xml
 .phpunit.result.cache
 
 # Other

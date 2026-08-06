@@ -140,7 +140,6 @@ $app = new Application('wand', '2.0.0'); // Update version
 my-project/
 ├── wand                      # CLI tool
 ├── composer.json
-├── tailwind.config.js
 ├── app/                      # Your application code
 │   ├── index.php
 │   └── css/

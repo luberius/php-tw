@@ -1,6 +1,5 @@
 # Composer
 /vendor/
-composer.lock
 
 # PHP
 *.log
@@ -23,10 +22,10 @@ ehthumbs.db
 Thumbs.db
 
 # Testing
-/phpunit.xml
 .phpunit.result.cache
 
 # Other
 *.bak
 *.tmp
 *.temp
+.claude/

@@ -11,7 +11,7 @@ PHP-TW is a project template that integrates PHP with Tailwind CSS, providing a 
 
 ## Requirements
 
-- PHP 8.0 or higher
+- PHP 8.1 or higher
 - Composer
 
 ## Installation
@@ -35,7 +35,15 @@ cd my-new-project
 php wand serve
 ```
 
-This will start a PHP development server and Tailwind CSS watcher. Your project will be accessible at `http://localhost:6969`.
+This starts the PHP development server and Tailwind CSS watcher. The first available port from 6969 through 7000 is selected and displayed in the terminal.
+
+### Building for Production
+
+```bash
+php wand build
+```
+
+This compiles minified CSS, optimizes Composer's autoloader, generates an OPcache preload file, and creates an Apache production configuration. The command returns a failure status if any required build step fails.
 
 ## Project Structure
 
@@ -48,11 +56,11 @@ my-new-project/
 ├── bootstrap/
 │   ├── app.php
 │   └── commands/
+│       ├── BuildCommand.php
 │       └── ServeCommand.php
 ├── vendor/
 ├── .gitignore
 ├── composer.json
-├── tailwind.config.js
 └── wand
 ```
 
@@ -61,14 +69,14 @@ my-new-project/
 - `app/index.php`: Entry point of your application
 - `bootstrap/`: Contains files for bootstrapping your application
 - `vendor/`: Composer dependencies
-- `tailwind.config.js`: Tailwind CSS configuration file
+- `bootstrap/commands/`: Argument-safe development and production commands
 - `wand`: Command-line script for various project tasks
 
 ## Customization
 
 ### Tailwind CSS
 
-You can customize Tailwind CSS by editing the `tailwind.config.js` file in your project root. Refer to the [Tailwind CSS documentation](https://tailwindcss.com/docs/configuration) for more information.
+PHP-TW uses Tailwind CSS v4's CSS-first configuration. Edit `app/css/app.css` and add `@theme`, `@utility`, or other Tailwind directives directly in CSS. Refer to the [Tailwind CSS theme documentation](https://tailwindcss.com/docs/theme) for details.
 
 ### Adding New Commands
 

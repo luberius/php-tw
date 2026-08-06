@@ -5,23 +5,23 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "Syaril A P",
+            "name": "Syahril A P",
             "email": "callmesyahril@gmail.com"
         }
     ],
     "require": {
-        "php": "^8.0",
+        "php": "^8.1",
         "symfony/console": "^5.4",
-        "symfony/process": "^5.4",
-        "luberius/tailwindcss": "^1.0"
+        "symfony/process": "^5.4.51",
+        "luberius/tailwindcss": "^1.1"
     },
     "require-dev": {
-        "phpunit/phpunit": "^10.5"
+        "phpunit/phpunit": "^10.5.62"
     },
-    "autoload": {
-        "psr-4": {
-            "Luberius\\PhpTw\\": "src/"
-        }
+    "homepage": "https://github.com/luberius/php-tw",
+    "support": {
+        "issues": "https://github.com/luberius/php-tw/issues",
+        "source": "https://github.com/luberius/php-tw"
     },
     "scripts": {
         "test": "phpunit",
@@ -33,6 +33,13 @@
             "@php post-create-script.php"
         ]
     },
-    "minimum-stability": "dev",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "archive": {
+        "exclude": [
+            "/.claude/",
+            "/.DS_Store",
+            "/.phpunit.result.cache",
+            "/vendor/"
+        ]
+    }
 }

@@ -1,0 +1,11 @@
+/.claude/            export-ignore
+/.DS_Store           export-ignore
+/.gitattributes      export-ignore
+/.phpunit.result.cache export-ignore
+/vendor/             export-ignore
+
+* text=auto
+*.php text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.xml text eol=lf

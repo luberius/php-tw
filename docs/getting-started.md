@@ -177,9 +177,9 @@ During development (`APP_DEBUG=true`), you'll see beautiful error pages with:
 
 In production (`APP_DEBUG=false`), users see a simple error message while details are hidden.
 
-## Hot Reload
+## Development Reloading
 
-PHP-TW includes automatic hot reload for PHP files. Edit any PHP file in your app and the server automatically restarts - no manual refresh needed!
+PHP-TW watches PHP files and automatically restarts the development server when they change. Refresh the browser to see PHP changes; Tailwind continues compiling CSS while the server runs.
 
 ## Stopping the Server
 

@@ -3,7 +3,7 @@
 namespace Tests\Unit\Bootstrap\Commands;
 
 use PHPUnit\Framework\TestCase;
-use BuildCommand;
+use Bootstrap\Commands\BuildCommand;
 
 class BuildCommandTest extends TestCase
 {

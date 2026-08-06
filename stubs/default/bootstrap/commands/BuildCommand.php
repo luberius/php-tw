@@ -1,10 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Bootstrap\Commands;
+
+use Luberius\TailwindCss\TailwindCss;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\Process;
-use Luberius\TailwindCss\TailwindCss;
 
 class BuildCommand extends Command
 {
@@ -16,102 +20,85 @@ class BuildCommand extends Command
         $output->writeln('<info>🚀 Building for production...</info>');
         $output->writeln('');
 
-        $this->buildCSS($output);
-        $this->optimizeAutoloader($output);
-        $this->generateOpcachePreload($output);
-        $this->createProductionHtaccess($output);
+        $successful = $this->buildCss($output);
+        $successful = $this->optimizeAutoloader($output) && $successful;
+        $successful = $this->generateOpcachePreload($output) && $successful;
+        $successful = $this->createProductionHtaccess($output) && $successful;
 
         $output->writeln('');
+        if (!$successful) {
+            $output->writeln('<error>Production build failed.</error>');
+            return Command::FAILURE;
+        }
+
         $output->writeln('<info>✅ Production build complete!</info>');
         $output->writeln('');
-
         $this->displayChecklist($output);
-
         return Command::SUCCESS;
     }
 
-    private function buildCSS(OutputInterface $output): void
+    protected function buildCss(OutputInterface $output): bool
     {
         $output->write('📦 Building minified CSS... ');
-
         try {
-            $tailwind = new TailwindCss();
-            $binPath = $tailwind->getBinPath();
-
-            $process = new Process([
-                $binPath,
+            $tailwind = $this->createTailwind();
+            $process = $this->createProcess([
+                $tailwind->getBinPath(),
                 '-i', 'app/css/app.css',
                 '-o', 'app/css/app.bin.css',
-                '--minify'
+                '--minify',
             ]);
-
             $process->run();
-
-            if ($process->isSuccessful()) {
-                $output->writeln('<info>✓</info>');
-            } else {
-                $output->writeln('<error>✗</error>');
-                $output->writeln('<error>' . $process->getErrorOutput() . '</error>');
-            }
-        } catch (\Exception $e) {
-            $output->writeln('<error>✗ ' . $e->getMessage() . '</error>');
+        } catch (\Throwable $exception) {
+            $output->writeln('<error>✗ ' . $exception->getMessage() . '</error>');
+            return false;
         }
+
+        return $this->reportProcessResult($process, $output);
     }
 
-    private function optimizeAutoloader(OutputInterface $output): void
+    protected function optimizeAutoloader(OutputInterface $output): bool
     {
         $output->write('⚡ Optimizing Composer autoloader... ');
-
-        $process = new Process([
-            'composer',
-            'dump-autoload',
-            '--optimize',
-            '--classmap-authoritative',
-            '--no-dev'
+        $process = $this->createProcess([
+            'composer', 'dump-autoload', '--optimize', '--classmap-authoritative', '--no-dev',
         ]);
-
         $process->run();
-
-        if ($process->isSuccessful()) {
-            $output->writeln('<info>✓</info>');
-        } else {
-            $output->writeln('<error>✗</error>');
-        }
+        return $this->reportProcessResult($process, $output);
     }
 
-    private function generateOpcachePreload(OutputInterface $output): void
+    protected function generateOpcachePreload(OutputInterface $output): bool
     {
         $output->write('🔥 Generating OPcache preload file... ');
-
         $vendorDir = __DIR__ . '/../../vendor';
         $preloadFile = __DIR__ . '/../opcache-preload.php';
+        $classmapFile = $vendorDir . '/composer/autoload_classmap.php';
 
-        if (!file_exists($vendorDir . '/composer/autoload_classmap.php')) {
+        if (!file_exists($classmapFile)) {
             $output->writeln('<comment>⚠ Skipped (run after composer install)</comment>');
-            return;
+            return true;
         }
 
-        $classmap = require $vendorDir . '/composer/autoload_classmap.php';
-
-        $preload = "<?php\n\n";
-        $preload .= "// Auto-generated OPcache preload file\n";
-        $preload .= "// Load this file in php.ini: opcache.preload=" . $preloadFile . "\n\n";
-
-        foreach ($classmap as $file) {
-            if (file_exists($file)) {
-                $preload .= "opcache_compile_file('" . addslashes($file) . "');\n";
+        $preload = "<?php\n\n// Auto-generated OPcache preload file\n";
+        $preload .= '// Load this file in php.ini: opcache.preload=' . $preloadFile . "\n\n";
+        foreach (require $classmapFile as $file) {
+            if (is_string($file) && file_exists($file)) {
+                $preload .= 'opcache_compile_file(' . var_export($file, true) . ");\n";
             }
         }
 
-        file_put_contents($preloadFile, $preload);
+        if ($this->writeFile($preloadFile, $preload) === false) {
+            $output->writeln('<error>✗ Failed to write OPcache preload file</error>');
+            return false;
+        }
         $output->writeln('<info>✓</info>');
+        return true;
     }
 
-    private function createProductionHtaccess(OutputInterface $output): void
+    protected function createProductionHtaccess(OutputInterface $output): bool
     {
         $output->write('🔒 Creating production .htaccess... ');
-
-        $htaccess = <<<'HTACCESS'
+        $contents = <<<'HTACCESS'
 # PHP-TW Production .htaccess
 
 <IfModule mod_deflate.c>
@@ -126,41 +113,62 @@ class BuildCommand extends Command
     ExpiresByType image/png "access plus 1 year"
     ExpiresByType image/webp "access plus 1 year"
     ExpiresByType text/css "access plus 1 month"
-    ExpiresByType application/pdf "access plus 1 month"
     ExpiresByType application/javascript "access plus 1 month"
-    ExpiresByType application/x-javascript "access plus 1 month"
     ExpiresByType image/x-icon "access plus 1 year"
 </IfModule>
 
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
-    Header set X-XSS-Protection "1; mode=block"
     Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
 HTACCESS;
 
-        file_put_contents(__DIR__ . '/../../.htaccess.production', $htaccess);
+        if ($this->writeFile(__DIR__ . '/../../.htaccess.production', $contents) === false) {
+            $output->writeln('<error>✗ Failed to write production .htaccess</error>');
+            return false;
+        }
         $output->writeln('<info>✓</info>');
+        return true;
+    }
+
+    protected function createTailwind(): TailwindCss
+    {
+        return new TailwindCss();
+    }
+
+    protected function createProcess(array $command): Process
+    {
+        return new Process($command);
+    }
+
+    protected function writeFile(string $path, string $contents)
+    {
+        return file_put_contents($path, $contents);
+    }
+
+    private function reportProcessResult(Process $process, OutputInterface $output): bool
+    {
+        if ($process->isSuccessful()) {
+            $output->writeln('<info>✓</info>');
+            return true;
+        }
+
+        $output->writeln('<error>✗</error>');
+        $error = trim($process->getErrorOutput() ?: $process->getOutput());
+        if ($error !== '') {
+            $output->writeln('<error>' . $error . '</error>');
+        }
+        return false;
     }
 
     private function displayChecklist(OutputInterface $output): void
     {
         $output->writeln('<comment>📋 Deployment Checklist:</comment>');
-        $output->writeln('');
-        $output->writeln('   □ Set <info>APP_ENV=production</info> in .env');
-        $output->writeln('   □ Set <info>APP_DEBUG=false</info> in .env');
-        $output->writeln('   □ Enable OPcache in php.ini:');
-        $output->writeln('      opcache.enable=1');
-        $output->writeln('      opcache.memory_consumption=128');
-        $output->writeln('      opcache.validate_timestamps=0');
-        $output->writeln('   □ Set OPcache preload in php.ini:');
-        $output->writeln('      opcache.preload=' . realpath(__DIR__ . '/../opcache-preload.php'));
-        $output->writeln('   □ Rename .htaccess.production to .htaccess (if using Apache)');
-        $output->writeln('   □ Ensure file permissions are correct (644 for files, 755 for directories)');
-        $output->writeln('');
+        $output->writeln('   □ Set APP_ENV=production and APP_DEBUG=false in .env');
+        $output->writeln('   □ Enable and configure OPcache');
+        $output->writeln('   □ Set opcache.preload=' . realpath(__DIR__ . '/../opcache-preload.php'));
+        $output->writeln('   □ Rename .htaccess.production to .htaccess when using Apache');
     }
 }
-
-return new BuildCommand();

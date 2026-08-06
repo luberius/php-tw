@@ -26,7 +26,7 @@ Visit `http://127.0.0.1:6969` to see your application.
 ## Key Features
 
 - **Single Command Setup** - Create projects instantly with Composer
-- **Live Development** - Auto-reloading dev server with live CSS compilation
+- **Live Development** - Development server with live CSS compilation
 - **Tailwind CSS v4** - Latest version with CSS-based configuration
 - **Automatic Binary Management** - No Node.js required
 - **Extensible CLI** - Built on Symfony Console with auto-discovery
@@ -34,7 +34,7 @@ Visit `http://127.0.0.1:6969` to see your application.
 
 ## Requirements
 
-- PHP 8.0 or higher
+- PHP 8.1 or higher
 - Composer
 - Internet connection (for initial Tailwind CLI download)
 

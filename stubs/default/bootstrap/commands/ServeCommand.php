@@ -1,244 +1,194 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Bootstrap\Commands;
 
+use Luberius\TailwindCss\TailwindCss;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Luberius\TailwindCss\TailwindCss;
+use Symfony\Component\Process\Process;
 
 class ServeCommand extends Command
 {
     protected static $defaultName = 'serve';
+    protected static $defaultDescription = 'Serve the application and watch for Tailwind CSS changes';
+
     private $serverProcess;
     private $tailwindProcess;
+    private $shuttingDown = false;
 
-    protected function configure()
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $this->setDescription('Serve the application and watch for Tailwind CSS changes');
-    }
-
-    protected function execute(InputInterface $input, OutputInterface $output)
-    {
-        $output->writeln([
-            "",
-            "<info>🚀 Starting server and Tailwind watcher...</info>",
-            ""
-        ]);
+        $output->writeln(['', '<info>🚀 Starting server and Tailwind watcher...</info>', '']);
 
         try {
-            $tailwind = new TailwindCss();
-            
-            $tailwindCommand = $tailwind->getBinPath();
-            $inputCss = 'app/css/app.css';
-            $outputCss = 'app/css/app.bin.css';
-            
+            $tailwind = $this->createTailwind();
             $port = $this->findAvailablePort($output);
-            if ($port === false) {
-                throw new \RuntimeException("No available ports found");
+            if ($port === null) {
+                throw new \RuntimeException('No available ports found');
             }
-            
-            $this->serverProcess = $this->startProcess("php -S 127.0.0.1:$port -t app");
-            $this->tailwindProcess = $this->startProcess("$tailwindCommand -i $inputCss -o $outputCss --watch");
 
-            $output->writeln([
-                "",
-                "🌐 <info>Server running on</info> <comment>http://127.0.0.1:$port</comment>",
-                "🎨 <info>Tailwind CSS watching for changes...</info>",
-                "🔄 <info>Hot reload enabled for PHP files...</info>",
-                "",
-                "📢 <comment>Press Ctrl+C to stop the server and watcher.</comment>",
-                ""
+            $this->serverProcess = $this->startProcess([
+                PHP_BINARY, '-S', "127.0.0.1:$port", '-t', 'app',
             ]);
-
+            $this->tailwindProcess = $this->startProcess(
+                $tailwind->getWatchCommand('app/css/app.css', 'app/css/app.bin.css')
+            );
             $this->registerShutdown($output);
+            $this->displayStarted($output, $port);
 
             $lastMtime = $this->getLatestFileModificationTime('app');
-
-            while ($this->isProcessRunning($this->serverProcess) && $this->isProcessRunning($this->tailwindProcess)) {
-                pcntl_signal_dispatch();
+            while ($this->serverProcess->isRunning() && $this->tailwindProcess->isRunning()) {
+                if (function_exists('pcntl_signal_dispatch')) {
+                    pcntl_signal_dispatch();
+                }
+                $this->writeProcessOutput($this->serverProcess, $output);
+                $this->writeProcessOutput($this->tailwindProcess, $output);
 
                 $currentMtime = $this->getLatestFileModificationTime('app');
-
                 if ($currentMtime > $lastMtime) {
                     $output->writeln('<comment>🔄 PHP files changed, restarting server...</comment>');
                     $this->restartPhpServer($port, $output);
                     $lastMtime = $currentMtime;
                 }
-
-                usleep(100000); // Sleep for 100ms to reduce CPU usage
+                usleep(100000);
             }
 
-            if (!$this->isProcessRunning($this->serverProcess)) {
-                $output->writeln('<error>PHP server process stopped unexpectedly</error>');
+            if (!$this->shuttingDown) {
+                $output->writeln('<error>A development process stopped unexpectedly.</error>');
+                $this->writeProcessOutput($this->serverProcess, $output);
+                $this->writeProcessOutput($this->tailwindProcess, $output);
+                return Command::FAILURE;
             }
-            if (!$this->isProcessRunning($this->tailwindProcess)) {
-                $output->writeln('<error>Tailwind process stopped unexpectedly</error>');
-            }
-
-        } catch (\Exception $e) {
-            $output->writeln('<error>An error occurred: ' . $e->getMessage() . '</error>');
-            $this->stopProcesses($output);
+            return Command::SUCCESS;
+        } catch (\Throwable $exception) {
+            $output->writeln('<error>An error occurred: ' . $exception->getMessage() . '</error>');
             return Command::FAILURE;
-        }
-
-        $this->stopProcesses($output);
-        return Command::SUCCESS;
-    }
-
-    private function findAvailablePort(OutputInterface $output, $startPort = 6969, $endPort = 7000)
-    {
-        $output->writeln("<comment>🔍 Searching for an available port...</comment>");
-        for ($port = $startPort; $port <= $endPort; $port++) {
-            $output->write("  Testing port $port... ");
-            if ($this->isPortAvailable($port)) {
-                $output->writeln("<info>✅ Available!</info>");
-                return $port;
-            } else {
-                $output->writeln("<error>❌ In use</error>");
-            }
-        }
-        
-        $output->writeln("<error>😕 No available ports found between $startPort and $endPort.</error>");
-        return false;
-    }
-
-    private function isPortAvailable($port)
-    {
-        $addresses = ['127.0.0.1', '::1', 'localhost'];
-        
-        foreach ($addresses as $address) {
-            // Check using socket creation
-            $sock = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-            if ($sock === false) {
-                continue;
-            }
-
-            // Set socket options to allow reuse of the address
-            socket_set_option($sock, SOL_SOCKET, SO_REUSEADDR, 1);
-
-            $result = @socket_bind($sock, $address, $port);
-            
-            if ($result !== false) {
-                socket_close($sock);
-                return true;  // Port is available on this address
-            }
-
-            socket_close($sock);
-
-            // Double-check using fsockopen
-            $conn = @fsockopen($address, $port, $errno, $errstr, 0.1);
-            if ($conn !== false) {
-                fclose($conn);
-                return false;  // Port is in use
-            }
-        }
-
-        return false;  // Port is not available on any tested address
-    }
-
-    private function startProcess($command)
-    {
-        $descriptorspec = array(
-           0 => array("pipe", "r"),
-           1 => array("pipe", "w"),
-           2 => array("pipe", "w")
-        );
-
-        // Replace 'localhost' with '127.0.0.1' in the command
-        $command = str_replace('localhost', '127.0.0.1', $command);
-
-        $process = proc_open($command, $descriptorspec, $pipes, null, null, ['bypass_shell' => true]);
-
-        if (is_resource($process)) {
-            stream_set_blocking($pipes[1], 0);
-            stream_set_blocking($pipes[2], 0);
-            return ['process' => $process, 'pipes' => $pipes];
-        }
-
-        throw new \RuntimeException("Failed to start process: $command");
-    }
-
-    private function isProcessRunning($processInfo)
-    {
-        $status = proc_get_status($processInfo['process']);
-        return $status['running'];
-    }
-
-    private function registerShutdown(OutputInterface $output)
-    {
-        pcntl_signal(SIGINT, function () use ($output) {
-            $output->writeln("\n<comment>Shutdown signal received.</comment>");
+        } finally {
             $this->stopProcesses($output);
-            exit;
-        });
+        }
     }
 
-    private function stopProcesses(OutputInterface $output)
+    protected function findAvailablePort(OutputInterface $output, int $startPort = 6969, int $endPort = 7000): ?int
     {
-        $output->writeln([
-            "",
-            "<comment>🛑 Shutting down services...</comment>"
-        ]);
-
-        if ($this->serverProcess) {
-            $this->terminateProcess($this->serverProcess, 'PHP server', $output);
-        }
-
-        if ($this->tailwindProcess) {
-            $this->terminateProcess($this->tailwindProcess, 'Tailwind CSS watcher', $output);
-        }
-
-        $output->writeln("<info>✅ Shutdown complete.</info>");
-    }
-
-    private function terminateProcess($processInfo, $name, OutputInterface $output)
-    {
-        proc_terminate($processInfo['process'], SIGTERM);
-        $output->writeln("  <info>✅ $name stopped.</info>");
-        foreach ($processInfo['pipes'] as $pipe) {
-            if (is_resource($pipe)) {
-                fclose($pipe);
+        $output->writeln('<comment>🔍 Searching for an available port...</comment>');
+        for ($port = $startPort; $port <= $endPort; $port++) {
+            if ($this->isPortAvailable($port)) {
+                $output->writeln("<info>✓ Using port $port</info>");
+                return $port;
             }
         }
-        proc_close($processInfo['process']);
+        return null;
+    }
+
+    protected function isPortAvailable(int $port): bool
+    {
+        $errno = 0;
+        $error = '';
+        $socket = @stream_socket_server("tcp://127.0.0.1:$port", $errno, $error);
+        if ($socket === false) {
+            return false;
+        }
+        fclose($socket);
+        return true;
+    }
+
+    protected function startProcess(array $command): Process
+    {
+        $process = new Process($command);
+        $process->setTimeout(null);
+        $process->start();
+        return $process;
+    }
+
+    protected function createTailwind(): TailwindCss
+    {
+        return new TailwindCss();
     }
 
     protected function getLatestFileModificationTime($dir)
     {
+        if (!is_dir($dir)) {
+            return 0;
+        }
         $latest = 0;
         $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir),
-            \RecursiveIteratorIterator::SELF_FIRST
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
         );
-
         foreach ($iterator as $file) {
             if ($file->isFile() && $file->getExtension() === 'php') {
-                $mtime = $file->getMTime();
-                if ($mtime > $latest) {
-                    $latest = $mtime;
-                }
+                $latest = max($latest, $file->getMTime());
             }
         }
-
         return $latest;
     }
 
     protected function restartPhpServer($port, OutputInterface $output)
     {
-        if ($this->serverProcess) {
-            proc_terminate($this->serverProcess['process'], SIGTERM);
-            foreach ($this->serverProcess['pipes'] as $pipe) {
-                if (is_resource($pipe)) {
-                    fclose($pipe);
-                }
-            }
-            proc_close($this->serverProcess['process']);
-        }
-
-        usleep(200000);
-
-        $this->serverProcess = $this->startProcess("php -S 127.0.0.1:$port -t app");
+        $this->stopProcess($this->serverProcess);
+        $this->serverProcess = $this->startProcess([
+            PHP_BINARY, '-S', "127.0.0.1:$port", '-t', 'app',
+        ]);
         $output->writeln('<info>✅ Server restarted successfully</info>');
+    }
+
+    private function registerShutdown(OutputInterface $output): void
+    {
+        if (!function_exists('pcntl_signal')) {
+            return;
+        }
+        pcntl_signal(SIGINT, function () use ($output): void {
+            $this->shuttingDown = true;
+            $output->writeln("\n<comment>Shutdown signal received.</comment>");
+            $this->stopProcesses($output);
+        });
+    }
+
+    private function displayStarted(OutputInterface $output, int $port): void
+    {
+        $output->writeln([
+            '',
+            "🌐 <info>Server running on</info> <comment>http://127.0.0.1:$port</comment>",
+            '🎨 <info>Tailwind CSS is watching for changes.</info>',
+            '📢 <comment>Press Ctrl+C to stop.</comment>',
+            '',
+        ]);
+    }
+
+    private function writeProcessOutput(?Process $process, OutputInterface $output): void
+    {
+        if ($process === null) {
+            return;
+        }
+        $stdout = $process->getIncrementalOutput();
+        $stderr = $process->getIncrementalErrorOutput();
+        if ($stdout !== '') {
+            $output->write($stdout);
+        }
+        if ($stderr !== '') {
+            $output->write('<error>' . $stderr . '</error>');
+        }
+    }
+
+    private function stopProcesses(OutputInterface $output): void
+    {
+        if ($this->serverProcess === null && $this->tailwindProcess === null) {
+            return;
+        }
+        $this->shuttingDown = true;
+        $this->stopProcess($this->serverProcess);
+        $this->stopProcess($this->tailwindProcess);
+        $this->serverProcess = null;
+        $this->tailwindProcess = null;
+        $output->writeln('<info>✅ Development services stopped.</info>');
+    }
+
+    private function stopProcess(?Process $process): void
+    {
+        if ($process !== null && $process->isRunning()) {
+            $process->stop(1, 15);
+        }
     }
 }
